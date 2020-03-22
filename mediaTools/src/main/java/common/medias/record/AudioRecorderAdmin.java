@@ -2,18 +2,21 @@ package common.medias.record;
 
 import android.annotation.SuppressLint;
 import android.media.AudioRecord;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import common.medias.ffmpeg.MediaEditor;
+import common.medias.systemcodec.AbsAudioEncoder;
+import common.medias.systemcodec.PcmToWav;
+import common.medias.systemcodec.RecordStreamListener;
 import common.medias.utils.CheckUtil;
 import common.medias.utils.FileUtils;
 import common.medias.utils.IOUtil;
 import common.medias.utils.L;
-import common.medias.systemcodec.AbsAudioEncoder;
-import common.medias.systemcodec.PcmToWav;
-import common.medias.systemcodec.RecordStreamListener;
+import common.medias.utils.ThreadPoolUitl;
 
 import static common.medias.record.AudioDefConfig.DEF_AUDIO_FORMAT;
 import static common.medias.record.AudioDefConfig.DEF_AUDIO_SOURCE;
@@ -304,14 +307,14 @@ public class AudioRecorderAdmin {
             //PCM --> AAC
             if (isNeedEncodeAACFile && !CheckUtil.isEmpty(theTempSaveRecordPcmFilePath)) {
                 boolean convertAacOk = false;
-//                convertAacOk = ExtraEpEditor.pcmConvertTo(
-//                        theTempSaveRecordPcmFilePath,
-//                        audioSampleRateInHz,
-//                        audioChannelsCount,
-//                        null,
-//                        theSaveRecordAudioFilePath,
-//                        null
-//                );
+                convertAacOk = MediaEditor.pcmConvertTo(
+                    theTempSaveRecordPcmFilePath,
+                        audioSampleRateInHz,
+                        audioChannelsCount,
+                        "aac",
+                        theSaveRecordAudioFilePath,
+                        null
+                );
                 if (!convertAacOk) {
                     if (aacAudioEncoder == null) {
                         aacAudioEncoder = AbsAudioEncoder.getDefAudioEncoder(theTempSaveRecordPcmFilePath);
@@ -366,8 +369,7 @@ public class AudioRecorderAdmin {
                     .startTheHardWork()
                     ;
                 }
-                // TODO: 2020/3/19 ??? 线程池？
-//                ExecutorManager.getInstance().execute(writeDataToFileTask);
+                ThreadPoolUitl.getMe().excute(writeDataToFileTask);
             } catch (Exception e) {
                 L.e(TAG, "-->startRecord() occur " + e);
                 status = STATUS_START_FAILURE;

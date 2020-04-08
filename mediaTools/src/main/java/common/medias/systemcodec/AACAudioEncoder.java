@@ -62,9 +62,75 @@ public class AACAudioEncoder extends AbsAudioEncoder {
     private int theFreqIndex = 4;
 
     private boolean isNeedAddAdtsHeader = true;
+    private int inputBufferSize = 2048;
 
     AACAudioEncoder(String rawAudioFile) {
         super(rawAudioFile);
+    }
+
+    /**
+     *        0: 96000 Hz
+     *      * 1: 88200 Hz
+     *      * 2: 64000 Hz
+     *      * 3: 48000 Hz
+     *      * 4: 44100 Hz
+     *      * 5: 32000 Hz
+     *      * 6: 24000 Hz
+     *      * 7: 22050 Hz
+     *      * 8: 16000 Hz
+     *      * 9: 12000 Hz
+     *      * 10: 11025 Hz
+     *      * 11: 8000 Hz
+     *      * 12: 7350 Hz
+     *      * 13: Reserved
+     *      * 14: Reserved
+     *      * 15: frequency is written explictly
+     * @param theSampleRate
+     * @return
+     */
+    private static int mapTheFreqIdxWhenAACEncode(int theSampleRate) {
+        int freqIdx = 15;
+        switch (theSampleRate) {
+            case 96000:
+                return 0;
+
+            case 88200:
+                return 1;
+
+            case 64000:
+                return 2;
+
+            case 48000:
+                return 3;
+
+            case 44100:
+                return 4;
+
+            case 32000:
+                return 5;
+
+            case 24000:
+                return 6;
+
+            case 22050:
+                return 7;
+
+            case 16000:
+                return 8;
+
+            case 12000:
+                return 9;
+
+            case 11025:
+                return 10;
+
+            case 8000:
+                return 11;
+
+            case 7350:
+                return 12;
+        }
+        return freqIdx;
     }
 
     @Override
@@ -209,6 +275,7 @@ public class AACAudioEncoder extends AbsAudioEncoder {
         codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
         return codec;
     }
+
     /**
      * 初始化AAC编码器
      */
@@ -239,6 +306,7 @@ public class AACAudioEncoder extends AbsAudioEncoder {
 
         return mediaCodec;
     }
+
     /**
      * Add ADTS header at the beginning of each and every AAC packet. This is
      * needed as MediaCodec encoder generates a packet of raw AAC data.
@@ -276,73 +344,6 @@ public class AACAudioEncoder extends AbsAudioEncoder {
         packet[5] = (byte) (((packetLen & 7) << 5) + 0x1F);
         packet[6] = (byte) 0xFC;
     }
-
-
-    /**
-     *        0: 96000 Hz
-     *      * 1: 88200 Hz
-     *      * 2: 64000 Hz
-     *      * 3: 48000 Hz
-     *      * 4: 44100 Hz
-     *      * 5: 32000 Hz
-     *      * 6: 24000 Hz
-     *      * 7: 22050 Hz
-     *      * 8: 16000 Hz
-     *      * 9: 12000 Hz
-     *      * 10: 11025 Hz
-     *      * 11: 8000 Hz
-     *      * 12: 7350 Hz
-     *      * 13: Reserved
-     *      * 14: Reserved
-     *      * 15: frequency is written explictly
-     * @param theSampleRate
-     * @return
-     */
-    private static int mapTheFreqIdxWhenAACEncode(int theSampleRate) {
-        int freqIdx = 15;
-        switch (theSampleRate) {
-            case 96000:
-                return 0;
-
-            case 88200:
-                return 1;
-
-            case 64000:
-                return 2;
-
-            case 48000:
-                return 3;
-
-            case 44100:
-                return 4;
-
-            case 32000:
-                return 5;
-
-            case 24000:
-                return 6;
-
-            case 22050:
-                return 7;
-
-            case 16000:
-                return 8;
-
-            case 12000:
-                return 9;
-
-            case 11025:
-                return 10;
-
-            case 8000:
-                return 11;
-
-            case 7350:
-                return 12;
-        }
-        return freqIdx;
-    }
-
 
     /**
      * 停止编码
@@ -433,8 +434,6 @@ public class AACAudioEncoder extends AbsAudioEncoder {
             outputIndex = mediaCodec.dequeueOutputBuffer(encodeBufferInfo, 0);
         }
     }
-
-    private int inputBufferSize = 2048;
 
     @Override
     public <I extends AbsAudioEncoder> I setNeedAddExtraBytes(boolean isNeedAddExtraBytes) {

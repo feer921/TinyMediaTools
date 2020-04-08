@@ -35,9 +35,10 @@ import static common.medias.record.AudioDefConfig.DEF_SAMPLE_RATE;
  * ******************(^_^)***********************
  */
 public class AudioRecorderAdmin {
-    private static final String TAG = "AudioRecorderAdmin";
-
-    private static AudioRecorderAdmin audioRecorder;
+    //未开始
+    public static final int STATUS_NO_READY = 0;
+    //预备
+    public static final int STATUS_READY = 1;
 
 //    /**
 //     * 采用频率
@@ -53,6 +54,18 @@ public class AudioRecorderAdmin {
      * 通道配置
      */
 //    private static final int DEF_CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_STEREO;//立体声
+    //录音
+    public static final int STATUS_STARTED = 2;
+    //暂停
+    public static final int STATUS_PAUSE = 3;
+    //停止
+    public static final int STATUS_STOP = 4;
+    /**
+     * 启动失败
+     */
+    public static final int STATUS_START_FAILURE = 5;
+    private static final String TAG = "AudioRecorderAdmin";
+    private static AudioRecorderAdmin audioRecorder;
     /**
      *
      */
@@ -61,27 +74,21 @@ public class AudioRecorderAdmin {
 
     // 缓冲区字节大小
     private int bufferSizeInBytes = 0;
-
     /**
      * 准备去读取MIC所采集的音频数据的字节大小
      */
     private int readyReadBufferSize = 1024;
-
     private byte[] toReadBuffer;
     //录音对象
     private AudioRecord audioRecord;
-
     //录音状态
     private volatile int status = STATUS_NO_READY;
-
     //文件名
     private String fileName;
-
     /**
      * 保存当前录音文件的路径
      */
     private String theSaveRecordAudioFilePath;
-
     private String theEncodeToWavAudioFilePath;
     /**
      * 临时存储PCM文件的路径
@@ -90,23 +97,6 @@ public class AudioRecorderAdmin {
     private String theTempSaveRecordPcmFilePath;
     //录音文件
     private List<String> filesName = new ArrayList<>();
-
-    //未开始
-    public static final int STATUS_NO_READY = 0;
-    //预备
-    public static final int STATUS_READY = 1;
-    //录音
-    public static final int STATUS_STARTED = 2;
-    //暂停
-    public static final int STATUS_PAUSE = 3;
-    //停止
-    public static final int STATUS_STOP = 4;
-
-    /**
-     * 启动失败
-     */
-    public static final int STATUS_START_FAILURE = 5;
-
     private AECerAndNoiseSuppressor mAECAndNS;
 
     private boolean isNeedEncodePcmToWavFile = false;
@@ -119,6 +109,13 @@ public class AudioRecorderAdmin {
      */
     private boolean isNeedDiscardForwardAudioBytes = true;
     private AbsAudioEncoder aacAudioEncoder;
+    private volatile RecordStreamListener recordStreamListener;
+    private int audioSource = DEF_AUDIO_SOURCE;
+    private int audioSampleRateInHz = DEF_SAMPLE_RATE;
+    private int channelConfig = DEF_CHANNEL_CONFIG;
+    private int audioFormat = DEF_AUDIO_FORMAT;
+    private int audioChannelsCount = 1;
+    private WriteDataToFileTask writeDataToFileTask = new WriteDataToFileTask();
     private AudioRecorderAdmin() {
     }
 
@@ -166,6 +163,7 @@ public class AudioRecorderAdmin {
         this.isNeedEncodeAACFile = isNeedEncodeAACFile;
         return this;
     }
+
     public AudioRecorderAdmin withAECAndNoiseSuppress(boolean isNeedAec, boolean isNeedNoiseSuppress) {
         if (this.mAECAndNS == null) {
             mAECAndNS = new AECerAndNoiseSuppressor();
@@ -176,22 +174,11 @@ public class AudioRecorderAdmin {
         return this;
     }
 
-    private volatile RecordStreamListener recordStreamListener;
-
     public AudioRecorderAdmin withNeedDiscardForwardAudioDatas(boolean isNeedDiscardForwardAudioBytes) {
         this.isNeedDiscardForwardAudioBytes = isNeedDiscardForwardAudioBytes;
         return this;
     }
 
-    private int audioSource = DEF_AUDIO_SOURCE;
-
-    private int audioSampleRateInHz = DEF_SAMPLE_RATE;
-
-    private int channelConfig = DEF_CHANNEL_CONFIG;
-
-    private int audioFormat = DEF_AUDIO_FORMAT;
-
-    private int audioChannelsCount = 1;
     /**
      * 根据配置信息，创建AudioRecord
      * @param audioSource 音频源 @see:{@linkplain # MediaRecorder.AudioSource.MIC}
@@ -259,6 +246,7 @@ public class AudioRecorderAdmin {
             toReadBuffer = new byte[readyReadBufferSize];
         }
     }
+
     /**
      * 创建默认的音频录音器
      * @return self
@@ -279,75 +267,6 @@ public class AudioRecorderAdmin {
             this.theEncodeToWavAudioFilePath = theSaveRecordAudioFilePath + ".wav";
         }
         return this;
-    }
-    private WriteDataToFileTask writeDataToFileTask = new WriteDataToFileTask();
-
-    private class WriteDataToFileTask implements Runnable {
-        @SuppressLint("NewApi")
-        @Override
-        public void run() {
-            L.w(TAG, "---> 去读取录音数据...");
-            //先清空一下，原来的缓存？？？
-            if (audioRecord != null) {
-//                int bufferSize = audioRecord.getBufferSizeInFrames();//960
-//                L.e(TAG, "--> bufferSize = " + bufferSize);
-                if (isNeedDiscardForwardAudioBytes) {
-                    int firstReadBytes = audioRecord.read(new byte[readyReadBufferSize], 0, readyReadBufferSize);
-                    int firstReadBytes2 = audioRecord.read(new byte[readyReadBufferSize], 0, readyReadBufferSize);
-                    L.i(TAG, "--> before real read ,first read : " + firstReadBytes);
-                }
-            }
-            writeDataToFile();
-            boolean willDeleteThePcmFile = false;
-            //PCM --> WAV
-            if (isNeedEncodePcmToWavFile && !CheckUtil.isEmpty(theSaveRecordAudioFilePath)) {
-                willDeleteThePcmFile = PcmToWav.pcmToWave(theTempSaveRecordPcmFilePath, audioChannelsCount,audioSampleRateInHz, theSaveRecordAudioFilePath);
-            }
-
-            //PCM --> AAC
-            if (isNeedEncodeAACFile && !CheckUtil.isEmpty(theTempSaveRecordPcmFilePath)) {
-                boolean convertAacOk = false;
-                convertAacOk = MediaEditor.pcmConvertTo(
-                    theTempSaveRecordPcmFilePath,
-                        audioSampleRateInHz,
-                        audioChannelsCount,
-                        "aac",
-                        theSaveRecordAudioFilePath,
-                        null
-                );
-                if (!convertAacOk) {
-                    if (aacAudioEncoder == null) {
-                        aacAudioEncoder = AbsAudioEncoder.getDefAudioEncoder(theTempSaveRecordPcmFilePath);
-                        aacAudioEncoder.setAudioSampleRate(audioSampleRateInHz)
-                                .setAudioChannelCount(1)
-                                .setEncodeBitRate(16000);
-                    }
-                }
-                aacAudioEncoder.encodeToFile(theSaveRecordAudioFilePath);
-                willDeleteThePcmFile = true;
-            }
-            //回调 通知 录音停止
-            if (recordStreamListener != null) {
-                recordStreamListener.onRecordData(null, RecordStreamListener.STATE_STOP_RECORD, 0);//用来表示结束了录制
-            }
-
-//            //一般pcm临时存储文件没有意义
-//            if (willDeleteThePcmFile) {
-//                new File(theTempSaveRecordPcmFilePath).delete();
-//            }
-            //上面不编码成WAV文件情况下还能再 编码成wav文件
-            if (!isNeedEncodePcmToWavFile && !CheckUtil.isEmpty(theEncodeToWavAudioFilePath)) {
-                PcmToWav.pcmToWave(theTempSaveRecordPcmFilePath, audioChannelsCount,audioSampleRateInHz, theEncodeToWavAudioFilePath);
-            }
-            //一般pcm临时存储文件没有意义
-            if (willDeleteThePcmFile) {
-                new File(theTempSaveRecordPcmFilePath).delete();
-            }
-            L.w(TAG, "---> 结束读取录音数据...willDeleteThePcmFile = " + willDeleteThePcmFile);
-            if (recordStreamListener != null) {
-                recordStreamListener.onRecordData(null,RecordStreamListener.STATE_WORK_OVER,0);
-            }
-        }
     }
 
     /**
@@ -373,6 +292,9 @@ public class AudioRecorderAdmin {
             } catch (Exception e) {
                 L.e(TAG, "-->startRecord() occur " + e);
                 status = STATUS_START_FAILURE;
+                if (recordStreamListener != null) {
+                    recordStreamListener.onRecordData(null, RecordStreamListener.STATE_WORK_FAIL, 1);
+                }
             }
         }
         L.e(TAG, "===startRecord===" + audioRecord.getState() +" / status=" + status);
@@ -414,6 +336,7 @@ public class AudioRecorderAdmin {
             mAECAndNS.stopTheHardWork();
         }
     }
+
     /**
      * 释放资源
      */
@@ -458,7 +381,6 @@ public class AudioRecorderAdmin {
         }
         status = STATUS_NO_READY;
     }
-
 
     /**
      * 将音频信息写入文件
@@ -610,6 +532,79 @@ public class AudioRecorderAdmin {
      */
     public int getPcmFilesCount() {
         return filesName.size();
+    }
+
+    private class WriteDataToFileTask implements Runnable,Comparable<WriteDataToFileTask> {
+        @SuppressLint("NewApi")
+        @Override
+        public void run() {
+            L.w(TAG, "---> 去读取录音数据...");
+            //先清空一下，原来的缓存？？？
+            if (audioRecord != null) {
+//                int bufferSize = audioRecord.getBufferSizeInFrames();//960
+//                L.e(TAG, "--> bufferSize = " + bufferSize);
+                if (isNeedDiscardForwardAudioBytes) {
+                    int firstReadBytes = audioRecord.read(new byte[readyReadBufferSize], 0, readyReadBufferSize);
+                    int firstReadBytes2 = audioRecord.read(new byte[readyReadBufferSize], 0, readyReadBufferSize);
+                    L.i(TAG, "--> before real read ,first read : " + firstReadBytes);
+                }
+            }
+            writeDataToFile();
+            boolean willDeleteThePcmFile = false;
+            //PCM --> WAV
+            if (isNeedEncodePcmToWavFile && !CheckUtil.isEmpty(theSaveRecordAudioFilePath)) {
+                willDeleteThePcmFile = PcmToWav.pcmToWave(theTempSaveRecordPcmFilePath, audioChannelsCount,audioSampleRateInHz, theSaveRecordAudioFilePath);
+            }
+
+            //PCM --> AAC
+            if (isNeedEncodeAACFile && !CheckUtil.isEmpty(theTempSaveRecordPcmFilePath)) {
+                boolean convertAacOk = false;
+                convertAacOk = MediaEditor.pcmConvertTo(
+                    theTempSaveRecordPcmFilePath,
+                        audioSampleRateInHz,
+                        audioChannelsCount,
+                        null,
+                        theSaveRecordAudioFilePath,
+                        null
+                );
+                if (!convertAacOk) {
+                    if (aacAudioEncoder == null) {
+                        aacAudioEncoder = AbsAudioEncoder.getDefAudioEncoder(theTempSaveRecordPcmFilePath);
+                        aacAudioEncoder.setAudioSampleRate(audioSampleRateInHz)
+                                .setAudioChannelCount(1)
+                                .setEncodeBitRate(16000);
+                    }
+                }
+                aacAudioEncoder.encodeToFile(theSaveRecordAudioFilePath);
+                willDeleteThePcmFile = true;
+            }
+            //回调 通知 录音停止
+            if (recordStreamListener != null) {
+                recordStreamListener.onRecordData(null, RecordStreamListener.STATE_STOP_RECORD, 0);//用来表示结束了录制
+            }
+
+//            //一般pcm临时存储文件没有意义
+//            if (willDeleteThePcmFile) {
+//                new File(theTempSaveRecordPcmFilePath).delete();
+//            }
+            //上面不编码成WAV文件情况下还能再 编码成wav文件
+            if (!isNeedEncodePcmToWavFile && !CheckUtil.isEmpty(theEncodeToWavAudioFilePath)) {
+                PcmToWav.pcmToWave(theTempSaveRecordPcmFilePath, audioChannelsCount,audioSampleRateInHz, theEncodeToWavAudioFilePath);
+            }
+            //一般pcm临时存储文件没有意义
+            if (willDeleteThePcmFile) {
+                new File(theTempSaveRecordPcmFilePath).delete();
+            }
+            L.w(TAG, "---> 结束读取录音数据...willDeleteThePcmFile = " + willDeleteThePcmFile);
+            if (recordStreamListener != null) {
+                recordStreamListener.onRecordData(null,RecordStreamListener.STATE_WORK_OVER,0);
+            }
+        }
+
+        @Override
+        public int compareTo(AudioRecorderAdmin.WriteDataToFileTask o) {
+            return 0;
+        }
     }
 
 }

@@ -22,7 +22,10 @@ import common.medias.utils.L;
  */
 public class AndroidMediaMuxer extends AbsMediaMuxer {
     private final static int ALLOCATE_BUFFER = 256 * 1024;
+    private static final String MIME_AUDIO_FLAG = "audio/";
+    private static final String MIME_VIDEO_FLAG = "video/";
     private MediaMuxer mediaMuxer;
+    private boolean isMuxerStarted = false;
 
     @Override
     public boolean startMux() {
@@ -47,14 +50,6 @@ public class AndroidMediaMuxer extends AbsMediaMuxer {
         }
         return false;
     }
-
-
-
-    private static final String MIME_AUDIO_FLAG = "audio/";
-    private static final String MIME_VIDEO_FLAG = "video/";
-
-
-    private boolean isMuxerStarted = false;
 
     @Override
     public boolean muxAudioAndVideo(String audioFilePath, String videoFilePath, String unSupportAudioMimeType) {

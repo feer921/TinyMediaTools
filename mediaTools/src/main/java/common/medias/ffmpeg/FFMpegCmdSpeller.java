@@ -45,7 +45,7 @@ public class FFMpegCmdSpeller extends ACmdLineArgsSpeller<FFMpegCmdSpeller> {
      * Constructs an empty list with an initial capacity of ten.
      */
     public FFMpegCmdSpeller() {
-        add(CMD_HEADER);//因为FFMpeg 的命令行都是以"ffmpeg"开头
+//        add(CMD_HEADER);//因为FFMpeg 的命令行都是以"ffmpeg"开头 removed by fee   ffmpeg 不需要拼接
     }
 
     /**
@@ -317,6 +317,7 @@ public class FFMpegCmdSpeller extends ACmdLineArgsSpeller<FFMpegCmdSpeller> {
      * @return self
      */
     public FFMpegCmdSpeller _filterComplex() {
+        append("-filter_complex");
         return this;
     }
 

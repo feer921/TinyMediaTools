@@ -40,6 +40,13 @@ public class AECerAndNoiseSuppressor {
      */
     private int curAudioSessionId;
 
+    public static boolean isSupportNoiseSuppress() {
+        return NoiseSuppressor.isAvailable();
+    }
+
+    public static boolean isSupportAEC() {
+        return AcousticEchoCanceler.isAvailable();
+    }
 
     private boolean initNoiseSuppressor(int sessionId) {
         if (mNoiseSuppressor == null) {
@@ -64,16 +71,6 @@ public class AECerAndNoiseSuppressor {
         }
         return false;
     }
-
-    public static boolean isSupportNoiseSuppress() {
-        return NoiseSuppressor.isAvailable();
-    }
-
-    public static boolean isSupportAEC() {
-        return AcousticEchoCanceler.isAvailable();
-    }
-
-
 
     private boolean initAec(int audioSession) {
 //        if (mAEC != null) {

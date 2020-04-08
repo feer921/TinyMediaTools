@@ -1,10 +1,14 @@
 package common.medias.ffmpeg;
 
 import com.arthenica.mobileffmpeg.FFmpeg;
+import com.arthenica.mobileffmpeg.FFprobe;
+import com.arthenica.mobileffmpeg.MediaInformation;
 import com.arthenica.mobileffmpeg.util.AsyncSingleFFmpegExecuteTask;
 import com.arthenica.mobileffmpeg.util.SingleExecuteCallback;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +29,11 @@ public class MediaEditor {
     //ffmpeg -i 1v.mp4 -i 1temp.mp4.aac -acodec copy -ss 0 -t 5 new.mp4 //合并音频
 
     /**
+     * 下面的命令是用audio音频替换video中的音频
+     * ffmpeg -i video.mp4 -i audio.wav -c:v copy -c:a aac -strict experimental -map 0:v:0 -map 1:a:0 output.mp4
+     *
      * 使用FFMpeg(命令)来将一个音频文件嵌入到目标视频文件中
+     *
      * 注：如果目标视频中已经有音频track了，则该音频track会被替换
      * @param audioFilePath 音频文件路径
      * @param videoFilePath 视频文件路径
@@ -34,12 +42,15 @@ public class MediaEditor {
      */
     public static boolean muxAudioAndVideo(String audioFilePath, String videoFilePath,
                                         String muxResultFilePath, SingleExecuteCallback editorListener) {
-        FFMpegCmdSpeller cmdBuilder = new FFMpegCmdSpeller();
-        cmdBuilder._i().append(audioFilePath)
-                ._i().append(videoFilePath)
-                ._vcodec().copy().append(muxResultFilePath);
-
-       return cmdBuilder.selfExecute(0, editorListener);
+        String cmdStr = "-i %s -i %s -c:v copy -c:a aac -strict experimental -map 0:v:0 -map 1:a:0 %s";
+        int rec = FFmpeg.execute(String.format(cmdStr, videoFilePath, audioFilePath, muxResultFilePath));
+//        FFMpegCmdSpeller cmdBuilder = new FFMpegCmdSpeller();
+//        cmdBuilder._i().append(audioFilePath)
+//                ._i().append(videoFilePath)
+//                ._vcodec().copy().append(muxResultFilePath);
+//
+//       return cmdBuilder.selfExecute(0, editorListener);
+        return 0 == rec;
     }
 
 
@@ -52,8 +63,35 @@ public class MediaEditor {
      * @param muxResultVideoFilePath
      * @throws InterruptedException
      */
-    public static void appendAVMedias(List<String> toAppendVideos, String muxResultVideoFilePath) throws InterruptedException {
+    public static boolean appendAVMedias(List<String> toAppendVideos, String muxResultVideoFilePath) {
+        String cmdStr = "-f concat -safe 0 -i %s -c copy %s";
+        if (toAppendVideos == null || toAppendVideos.isEmpty()) {
+            return false;
+        }
+        String aMediaFilePath = toAppendVideos.get(0);
+        File parentPathFile = new File(aMediaFilePath).getParentFile();
+        File listFile = new File(parentPathFile, "list.txt");
+        listFile.delete();
+        FileWriter fw = null;
+        try {
+            fw = new FileWriter(listFile, true);
+            for (String toAppendVideo : toAppendVideos) {
+                fw.write(String.format("file \'%s\'\n", toAppendVideo));
+            }
+            fw.flush();
+        } catch (Exception e) {
 
+        }finally {
+            if (fw != null) {
+                try {
+                    fw.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        int rec = FFmpeg.execute(String.format(cmdStr, listFile.getAbsolutePath(), muxResultVideoFilePath));
+        return 0 == rec;
     }
 
 
@@ -65,7 +103,7 @@ public class MediaEditor {
      * @param outputFilePath 输出的文件路径
      * @param editorListener 命令执行监听者，不为null时为异步执行
      */
-    public static void deMuxVideo(String toDeMuxVideoFilePath, boolean isDemuxOutVideo, String codecFormat,
+    public static boolean deMuxVideo(String toDeMuxVideoFilePath, boolean isDemuxOutVideo, String codecFormat,
                                   String outputFilePath, SingleExecuteCallback editorListener) {
         File resultFile = new File(outputFilePath);
         if (resultFile.exists()) {//FFMpeg 好象如果生成的文件存在时会操作失败(其实不是操作失败，是命令行会提示是否覆盖,然APP内无法输入),所以先删除
@@ -87,8 +125,7 @@ public class MediaEditor {
             cmdSpeller._vn();//不处理视频
         }
         cmdSpeller.append(outputFilePath);
-        cmdSpeller.selfExecute(0, editorListener);
-
+       return cmdSpeller.selfExecute(0, editorListener);
     }
 
     /**
@@ -156,10 +193,7 @@ public class MediaEditor {
         if (ignoreAudio && ignoreVideo) {
             return false;
         }
-        // TODO: 2020/3/18 这里没弄好
-//        long curMediaDuration = VideoUitls.getDuration(toClipAVMediaFilePath) / 1000;//微秒-->毫秒
-        long curMediaDuration = 0;
-
+        long curMediaDuration = extractMediaDuration(toClipAVMediaFilePath) / 1000;
         L.i("ExtraEpEditor", "-->clipAVMediaByRemoveEndTime() the media duration in ms is " + curMediaDuration);
         if (curMediaDuration == 0 || curMediaDuration <= removeEndTimeMS) {
             L.e("ExtraEpEditor", "-->clipAVMediaByRemoveEndTime() media duration exception...");
@@ -175,6 +209,7 @@ public class MediaEditor {
     /**
      * 多个音频混音
      * ffmpeg -i 124.mp3 -i 123.mp3 -filter_complex amix=inputs=2:duration=first:dropout_transition=2 -f mp3 remix.mp3
+     * -i a.aac -i b.aac -filter_complex "[0:a][1:a]amerge=inputs=2[a]" -map "[a]" -ac 2 output.aac 这个快
      *       解释：-i代表输入参数
      *       -filter_complex ffmpeg滤镜功能，非常强大，详细请查看文档
      *       amix是混合多个音频到单个音频输出
@@ -295,5 +330,80 @@ public class MediaEditor {
         return true;
     }
 
+    /**
+     * 转换音频文件格式
+     * eg.: aac --> wav/mp3/... 转换的格式由 文件名后缀指定(eg.: out.mp3/out.wav)
+     * @param theAudioFilePath 要转换的音频文件路径
+     * @param resampleRate 重 采样率
+     * @param audioChannelCount 重采样的 声道数
+     * @param outputFilePath 输出文件路径
+     * @param editorListener 为null时为同步执行；
+     * @return true: 异步执行无参考意义。同步执行时：成功；否则为失败
+     */
+    public static boolean convertAudioFileFormat(String theAudioFilePath,String resampleRate,int audioChannelCount,String outputFilePath,
+                                                 SingleExecuteCallback editorListener){
+        if (isEmpty(theAudioFilePath) || isEmpty(outputFilePath)) {
+            return false;
+        }
+        File theAudioFile = new File(theAudioFilePath);
+        if (!theAudioFile.exists() || theAudioFile.length() < 1) {
+            return false;
+        }
+        FFMpegCmdSpeller cmdSpeller = new FFMpegCmdSpeller();
+        cmdSpeller._i(theAudioFilePath)
+        ;
+        if (audioChannelCount < 1) {
+            audioChannelCount = 1;
+        }
+        if (!isEmpty(resampleRate)) {
+            cmdSpeller.append("-ar").append(resampleRate)
+                    ._ac(audioChannelCount)
+            ;
+        }
+        cmdSpeller._y().outPut(outputFilePath);
+        return cmdSpeller.selfExecute(0, editorListener);
+    }
 
+    public static long extractMediaDuration(String theMediaFilePath) {
+        long duration = 0;
+        if (!isEmpty(theMediaFilePath)) {
+            MediaInformation mediaInfo = FFprobe.getMediaInformation(theMediaFilePath);
+            if (mediaInfo != null) {
+                Long durationL = mediaInfo.getDuration();
+                if (durationL != null) {
+                    duration = durationL;
+                }
+            }
+        }
+        return duration;
+    }
+
+    public static MediaInfoWrapper extractMediaInfos(String theMediaFilePath) {
+        if (!isEmpty(theMediaFilePath)) {
+            return new MediaInfoWrapper(FFprobe.getMediaInformation(theMediaFilePath));
+        }
+        return null;
+    }
+
+    /**
+     * 调整输入的 媒体文件的音量 然后输出为一个新媒体文件
+     *  ffmpeg -i a.aac -af volume=10dB -y out.aac
+     * @param inputMediaFilePath 输入的媒体文件
+     * @param targetVolumeInfo 要调整到的目标 音量; eg.: 0dB; 10dB
+     * @param outPutFilePath 调整后的输出文件
+     * @param editorListener 为null是为同步执行；否则为异步执行
+     * @return true:异步执行或者同步执行ok; false: 执行失败
+     */
+    public static boolean adjustMediaVolume(String inputMediaFilePath, String targetVolumeInfo, String outPutFilePath, SingleExecuteCallback editorListener) {
+        if (isEmpty(inputMediaFilePath) || isEmpty(outPutFilePath)) {
+            return false;
+        }
+        FFMpegCmdSpeller cmdSpeller = new FFMpegCmdSpeller();
+        cmdSpeller._i(inputMediaFilePath)
+                .append("-af")
+                .append(String.format("volume=%s",targetVolumeInfo))
+                ._y()
+                .outPut(outPutFilePath);
+        return cmdSpeller.selfExecute(0, editorListener);
+    }
 }

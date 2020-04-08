@@ -21,16 +21,15 @@ public final class ThreadPoolUitl {
     private static final int MAX_POOL_SIZE = 5;          //最大线程池的数量
     private static final int KEEP_ALIVE_TIME = 1;        //存活的时间
     private static final TimeUnit UNIT = TimeUnit.HOURS; //时间单位
+    private volatile static ThreadPoolUitl me;
     /**
      * 核心线程池的数量，同时能执行的线程数量，默认3个
      */
     private int corePoolSize = 3;
     private ThreadPoolExecutor executorService;
-
     private ThreadPoolUitl() {
 
     }
-    private volatile static ThreadPoolUitl me;
 
     public static ThreadPoolUitl getMe() {
         if (me == null) {

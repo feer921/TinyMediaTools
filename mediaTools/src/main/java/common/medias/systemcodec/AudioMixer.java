@@ -18,10 +18,6 @@ import java.util.Arrays;
  */
 public class AudioMixer {
 
-    public boolean decodeAudioFile(String theAudioFile) {
-        return false;
-    }
-
     public static boolean mixAudios(String mixResultFilePath, String... rawAudioFiles) {
         if (rawAudioFiles == null || mixResultFilePath == null) {
             return false;
@@ -134,6 +130,10 @@ public class AudioMixer {
             oneMixAudioBytes[sr * 2 + 1] = (byte) ((sMixAudio[sr] & 0xFF00) >> 8);
         }
         return oneMixAudioBytes;
+    }
+
+    public boolean decodeAudioFile(String theAudioFile) {
+        return false;
     }
 
 

@@ -12,8 +12,6 @@ package common.medias.systemcodec;
  */
 public abstract class AbsAudioEncoder {
     protected final String TAG = getClass().getSimpleName();
-    String rawAudioFilePath;
-
     /**
      * 编码 比特率 (码流)
      * def: 128000 单位：字节 B
@@ -21,19 +19,17 @@ public abstract class AbsAudioEncoder {
 
 //    protected int encodeBitRate = 128000;
     protected int encodeBitRate = 0;
-
-
     /**
      * 音频通道数
      * def: 1
      */
     protected int audioChannelCount = 2;
-
     /**
      * 音频重采样率
      * def: 44100
      */
     protected int audioSampleRate = 44100;
+    String rawAudioFilePath;
 
 
     AbsAudioEncoder(String theRawAudioFilePath) {

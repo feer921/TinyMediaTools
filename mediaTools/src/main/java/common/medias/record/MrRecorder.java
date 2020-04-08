@@ -30,11 +30,6 @@ import common.medias.utils.L;
  * ******************(^_^)***********************
  */
 public class MrRecorder {
-    protected final String TAG = getClass().getSimpleName();
-    protected MediaRecorder mediaRecorder;
-
-    protected volatile int recordState = STATE_IDLE;
-
     /**
      * 状态：空闲
      */
@@ -59,16 +54,17 @@ public class MrRecorder {
      * 状态：错误之准备时
      */
     public static final int STATE_ERROR_PREPARE = STATE_ERROR + 1;
-
     /**
      * 状态：错误之开始时
      */
     public static final int STATE_ERROR_START = STATE_ERROR_PREPARE + 1;
-
     /**
      * 状态：已停止
      */
     public static final int STATE_STOPPED = STATE_ERROR_START + 1;
+    protected final String TAG = getClass().getSimpleName();
+    protected MediaRecorder mediaRecorder;
+    protected volatile int recordState = STATE_IDLE;
     /**
      * 录制的媒体保存路径
      * eg.: /xxx/xx/record/
@@ -118,6 +114,9 @@ public class MrRecorder {
     private boolean isNeedNoiseSuppressor;
 
     private AECerAndNoiseSuppressor aecAndNs;
+    private MediaRecorder.OnErrorListener outSideErrorListener;
+    private MediaRecorder.OnInfoListener outSideInfoListener;
+
     /**
      * 要设置录制时的音频源
      * @param audioSource 要使用的音频源 <P>
@@ -211,6 +210,7 @@ public class MrRecorder {
         this.mediaSavePath = outputFilePath;
         return this;
     }
+
     /**
      * MediaRecorder recorder = new MediaRecorder();
      recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
@@ -271,6 +271,7 @@ public class MrRecorder {
             mediaRecorder.reset();
         }
     }
+
     public boolean prepare() {
         return prepare(true);
     }
@@ -327,6 +328,33 @@ public class MrRecorder {
     public boolean isRecording() {
         return recordState == STATE_RECORDING;
     }
+
+    public MrRecorder withOnErrorListener(MediaRecorder.OnErrorListener listener) {
+        this.outSideErrorListener = listener;
+        return this;
+    }
+
+    public MrRecorder withOnInfoListener(MediaRecorder.OnInfoListener listener) {
+        this.outSideInfoListener = listener;
+        return this;
+    }
+
+    protected void onMrError(MediaRecorder mr, int what, int extra) {
+        if (what == MediaRecorder.MEDIA_ERROR_SERVER_DIED) {
+            //媒体服务挂了/
+
+        }
+        if (outSideErrorListener != null) {
+            outSideErrorListener.onError(mr,what,extra);
+        }
+    }
+
+    protected void onMrInfo(MediaRecorder mr, int what, int extra) {
+        if (outSideInfoListener != null) {
+            outSideInfoListener.onInfo(mr,what,extra);
+        }
+    }
+
     private class RecordListener implements MediaRecorder.OnErrorListener, MediaRecorder.OnInfoListener{
 
         /**
@@ -360,33 +388,6 @@ public class MrRecorder {
         @Override
         public void onInfo(MediaRecorder mr, int what, int extra) {
                 onMrInfo(mr,what,extra);
-        }
-    }
-    private MediaRecorder.OnErrorListener outSideErrorListener;
-    public MrRecorder withOnErrorListener(MediaRecorder.OnErrorListener listener) {
-        this.outSideErrorListener = listener;
-        return this;
-    }
-    private MediaRecorder.OnInfoListener outSideInfoListener;
-    public MrRecorder withOnInfoListener(MediaRecorder.OnInfoListener listener) {
-        this.outSideInfoListener = listener;
-        return this;
-    }
-
-
-    protected void onMrError(MediaRecorder mr, int what, int extra) {
-        if (what == MediaRecorder.MEDIA_ERROR_SERVER_DIED) {
-            //媒体服务挂了/
-
-        }
-        if (outSideErrorListener != null) {
-            outSideErrorListener.onError(mr,what,extra);
-        }
-    }
-
-    protected void onMrInfo(MediaRecorder mr, int what, int extra) {
-        if (outSideInfoListener != null) {
-            outSideInfoListener.onInfo(mr,what,extra);
         }
     }
 

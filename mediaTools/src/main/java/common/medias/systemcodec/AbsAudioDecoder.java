@@ -14,6 +14,7 @@ import java.io.IOException;
  */
 public abstract class AbsAudioDecoder {
     protected String TAG = getClass().getSimpleName();
+    protected IAudioDecodeCallback mCallback;
     /**
      * 包含了音频track的音、视频文件路径
      */
@@ -35,14 +36,6 @@ public abstract class AbsAudioDecoder {
      */
     public abstract RawAudioInfo decodeToFile(String outPutDecodedFilePath)throws IOException;
 
-    public static class RawAudioInfo {
-        public String tempRawFile;
-        public int size;
-        public long sampleRate;
-        public int channel;
-    }
-    protected IAudioDecodeCallback mCallback;
-
     protected void onDecodeCallback(byte[] decodedBytes, double decodeProgress) {
         if (mCallback != null) {
             mCallback.onDecode(decodedBytes, decodeProgress);
@@ -52,7 +45,15 @@ public abstract class AbsAudioDecoder {
     public void setAudioDecodeCallback(IAudioDecodeCallback l) {
         this.mCallback = l;
     }
+
     public interface IAudioDecodeCallback{
         void onDecode(byte[] decodedBytes, double progress);
+    }
+
+    public static class RawAudioInfo {
+        public String tempRawFile;
+        public int size;
+        public long sampleRate;
+        public int channel;
     }
 }

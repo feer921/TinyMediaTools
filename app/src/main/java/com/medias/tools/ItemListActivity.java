@@ -101,7 +101,7 @@ public class ItemListActivity extends AppCompatActivity {
                             .commit();
                 } else {
                     Context context = view.getContext();
-                    Intent intent = new Intent(context, ItemDetailActivity.class);
+                    Intent intent = new Intent(context, AActivity.class);
                     intent.putExtra(ItemDetailFragment.ARG_ITEM_ID, item.id);
 
                     context.startActivity(intent);
